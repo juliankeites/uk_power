@@ -1,6 +1,6 @@
 import json
 import warnings
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, 
 import time as time_module  # Avoid naming conflict
 from datetime import time as datetime_time  # Import time class from datetime
 
@@ -1182,15 +1182,29 @@ def run_app():
         st.markdown("#### 🔋 Battery Optimization")
         
         # Find best charging times
-        excess_solar_mask = (solar_power_kw > baseload) & df_comparison["day_mask"]
+        # Ensure both are numpy arrays with the same length
+        solar_power_array = np.array(solar_power_kw)
+        day_mask_array = np.array(df_comparison["day_mask"])
+        excess_solar_mask = (solar_power_array > baseload) & day_mask_array
+        
         if excess_solar_mask.any():
-            best_charge_hours = pd.Series(solar_power_kw - baseload)[excess_solar_mask]
-            best_charge_times = best_charge_hours.nlargest(3).index
+            # Create a Series with the same index as df_comparison
+            excess_power_series = pd.Series(
+                solar_power_array - baseload,
+                index=df_comparison.index
+            )
             
-            st.write("**Best times for solar charging:**")
-            for time in best_charge_times:
-                excess = solar_power_kw[time] - baseload
-                st.write(f"- {time.strftime('%H:%M')}: {excess:.2f} kW excess solar")
+            # Filter using the boolean mask
+            best_charge_hours = excess_power_series[excess_solar_mask]
+            
+            # Get the top 3 times with most excess power
+            if len(best_charge_hours) > 0:
+                best_charge_times = best_charge_hours.nlargest(min(3, len(best_charge_hours))).index
+                
+                st.write("**Best times for solar charging:**")
+                for time in best_charge_times:
+                    excess = best_charge_hours[time]
+                    st.write(f"- {time.strftime('%H:%M')}: {excess:.2f} kW excess solar")
         
         if powerwall_mode == "Time-Based Control":
             st.write("**Time-Based Control Strategy:**")
@@ -1210,12 +1224,17 @@ def run_app():
             st.write(f"- Max export power: {export_results['max_export_kw']:.2f} kW")
             
             # Find best export times
-            high_export_mask = df_comparison["export_potential_kw"] > 1.0  # More than 1kW
+            export_potential_series = pd.Series(
+                export_results['export_power_kw'],
+                index=df_comparison.index
+            )
+            high_export_mask = export_potential_series > 1.0  # More than 1kW
+            
             if high_export_mask.any():
-                export_times = df_comparison.index[high_export_mask]
+                export_times = export_potential_series[high_export_mask].index
                 st.write("**Best export times today:**")
                 for i, time in enumerate(export_times[:3]):  # Show top 3
-                    export_power = df_comparison["export_potential_kw"][time]
+                    export_power = export_potential_series[time]
                     st.write(f"- {time.strftime('%H:%M')}: {export_power:.2f} kW")
 
     # Export results
