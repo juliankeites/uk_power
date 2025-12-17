@@ -49,7 +49,7 @@ def fetch_power_data(region, days):
         df = pd.DataFrame(prices_list)
         
         # Rename columns for clarity and convert time
-        df['date_time'] = pd.to_datetime(df['date_time'])
+        df['date_time'] = pd.to_datetime(df['date_time']).dt.tz_localize(None)
         df = df.rename(columns={
             'agile_pred': 'Predicted Price (p/kWh)',
             'agile_low': 'Low Estimate',
